@@ -119,18 +119,15 @@ export default function App() {
       const { x: mx, y: my, active: mActive } = mousePosRef.current;
 
       blocksRef.current.forEach((b) => {
-        // Smooth Color Fade
         if (Math.abs(b.paintedTarget - b.currentBlend) > 0.001) {
           b.currentBlend += (b.paintedTarget - b.currentBlend) * 0.14;
         }
 
-        // Breathing / Floating
         const floatX = Math.sin(elapsed * 1.8 + b.r * 0.15 + b.phase * 0.2) * 0.7;
         const floatY = Math.cos(elapsed * 2.2 + b.c * 0.15 + b.phase * 0.2) * 1.0;
         const targetX = b.baseX + floatX;
         const targetY = b.baseY + floatY;
 
-        // Scatter & Reform
         if (mActive) {
           const dx = b.x + PIXEL_SIZE / 2 - mx;
           const dy = b.y + PIXEL_SIZE / 2 - my;
@@ -147,7 +144,6 @@ export default function App() {
         b.x += b.vx;
         b.y += b.vy;
 
-        // Shimmering Gold
         let [r, g, bCol] = b.origColor;
         if (b.isGold && b.currentBlend > 0.6) {
           const shimmer = Math.sin(elapsed * 4.5 + b.phase);
@@ -203,13 +199,18 @@ export default function App() {
     return () => cancelAnimationFrame(animId);
   }, []);
 
-  // Mouse & Touch Event Handlers
-  const handlePointerMove = (clientX, clientY) => {
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
+  // ဖုန်း Screen အရွယ်အစား ပြောင်းလဲသော်လည်း ထိတွေ့နေရာ အတိအကျရစေရန် တွက်ချက်ခြင်း
+  const handlePointerMove = (e) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    
+    const scaleX = WIDTH / rect.width;
+    const scaleY = HEIGHT / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
 
-    // Browser မူဝါဒအရ User စတင်ထိတွေ့မှ သီချင်းစဖွင့်ခြင်း
+    // ဖုန်း Screen ကို စတင်ထိလိုက်သည်နှင့် သီချင်းစဖွင့်ခြင်း
     if (!isPlaying && audioRef.current) {
       audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
     }
@@ -223,6 +224,11 @@ export default function App() {
     prevMouseRef.current = { x, y };
   };
 
+  const handlePointerEnd = () => {
+    mousePosRef.current.active = false;
+    prevMouseRef.current = null;
+  };
+
   const handleReset = () => {
     blocksRef.current.forEach((b) => {
       b.paintStage = 0;
@@ -232,36 +238,38 @@ export default function App() {
     });
     if (audioRef.current) {
       audioRef.current.currentTime = 0;
-      audioRef.current.play();
+      audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
     }
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#0e0e0e', minHeight: '100vh', justifyContent: 'center', color: '#fff', fontFamily: 'sans-serif' }}>
-      <audio ref={audioRef} src="/music.wav" loop muted={isMuted} />
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#0e0e0e', minHeight: '100vh', justifyContent: 'center', padding: '16px', boxSizing: 'border-box', color: '#fff', fontFamily: 'sans-serif', overflow: 'hidden' }}>
+      <audio ref={audioRef} src="/music.wav" loop muted={isMuted} playsInline />
       
       <canvas
         ref={canvasRef}
         width={WIDTH}
         height={HEIGHT}
-        style={{ borderRadius: '8px', boxShadow: '0 10px 30px rgba(0,0,0,0.8)', cursor: 'crosshair', touchAction: 'none' }}
-        onMouseMove={(e) => handlePointerMove(e.clientX, e.clientY)}
-        onMouseLeave={() => {
-          mousePosRef.current.active = false;
-          prevMouseRef.current = null;
+        style={{
+          width: '100%',
+          maxWidth: `${WIDTH}px`,
+          height: 'auto',
+          borderRadius: '8px',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.8)',
+          cursor: 'crosshair',
+          touchAction: 'none',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
         }}
-        onTouchMove={(e) => {
-          const touch = e.touches;
-          handlePointerMove(touch.clientX, touch.clientY);
-        }}
-        onTouchEnd={() => {
-          mousePosRef.current.active = false;
-          prevMouseRef.current = null;
-        }}
+        onPointerDown={handlePointerMove}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerEnd}
+        onPointerLeave={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
       />
 
       <div style={{ marginTop: '16px', display: 'flex', gap: '12px' }}>
-        <button onClick={handleReset} style={btnStyle}>Reset (R)</button>
+        <button onClick={handleReset} style={btnStyle}>Reset</button>
         <button onClick={() => setIsMuted(!isMuted)} style={btnStyle}>
           {isMuted ? 'Unmute' : 'Mute'}
         </button>
@@ -271,10 +279,11 @@ export default function App() {
 }
 
 const btnStyle = {
-  padding: '8px 16px',
+  padding: '10px 20px',
   background: '#222',
   color: '#f5d061',
   border: '1px solid #444',
   borderRadius: '6px',
   cursor: 'pointer',
+  fontSize: '15px',
 };
